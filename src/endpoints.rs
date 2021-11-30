@@ -7,6 +7,7 @@ use argon2::{self, Config};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{self, ConnectionManager};
 use rand::Rng;
+use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::str;
@@ -158,7 +159,11 @@ pub struct ApiKeyRequest {
 
 // NODE REQUESTS
 #[post("/interactnode")]
-pub async fn get_photo(id: Identity, pool: web::Data<DbPool>, req_body: String) -> impl Responder {
+pub async fn get_photo(
+    id: Identity,
+    pool: web::Data<DbPool>,
+    req_body: String,
+) -> Result<impl Responder, Error> {
     let conn = pool.get().expect("couldn't get db connection from pool");
     // check login with actix_identity
     match id.identity() {
@@ -168,13 +173,24 @@ pub async fn get_photo(id: Identity, pool: web::Data<DbPool>, req_body: String) 
                 serde_json::from_str(&req_body).expect("error in login body");
             let api_key = body_json.api_key;
             // save key_request
-            let new_request = save_api_request(&conn, api_key).unwrap();
+            let key_request = save_api_request(&conn, api_key).unwrap();
             // process request
+            let client = reqwest::Client::new();
+            let res = client
+                .post("http://127.0.0.1:5001/api/v0/bitswap/reprovide")
+                .body("the exact body that is sent")
+                .send()
+                .await
+                .expect("unsuccessful node interaction")
+                .text()
+                .await
+                .expect("no text");
+
             // return response
             // return all api_keys and user data
-            HttpResponse::Ok().body(json!(new_request))
+            Ok(HttpResponse::Ok().body(json!(res)))
         }
-        None => HttpResponse::Forbidden().finish(),
+        None => Ok(HttpResponse::Forbidden().finish()),
     }
 }
 

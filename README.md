@@ -21,6 +21,8 @@ Endpoints (with JSON data, if required)
 ```
 
 Some things (amongst others) I would change for PROD.
+- Separate things into services: simpleapi, auth etc...
+- A configured IPFS server
 - better session management
   - usually running redis
 - improved data retrieval (turning requests into a CSV per api_key, perhaps)
