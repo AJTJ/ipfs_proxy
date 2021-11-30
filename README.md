@@ -4,9 +4,10 @@ Setup:
 - start a postgres docker image
 `docker run --name ipfs-node-postgres -e POSTGRES_PASSWORD=mysecretpassword -dp 5432:5432 postgres`
 - start/compile the server with `cargo run --bin ipfs_proxy`
-- interact with `http://127.0.0.1:8090/` through postman or something of the like
+- interact with `http://127.0.0.1:8090/` through postman or curl
 
 Endpoints (with JSON data, if required)
+```
 - #[post("/register")]
   - {email, password} 
 - #[post("/login")]
@@ -17,6 +18,7 @@ Endpoints (with JSON data, if required)
   - {api_key}
 - #[post("/interactnode")]
   - {api_key}
+```
 
 Some things (amongst others) I would change for PROD.
 - better session management
@@ -31,23 +33,7 @@ Some things (amongst others) I would change for PROD.
 - email verification
 - write some tests
 - more checks to ensure that api_keys are valid, user id is valid, etc.
-
-Schema
-- user
-  - id
-  - email
-  - pw_hash
-  - salt
-- api_key
-  - id
-  - user_id
-  - key_value
-  - is_enabled
-- key_requests
-  - id
-  - api_key_id
-  - date_time
-  - key_was_enabled
+- containerization to ensure endpoint security
 
 STEPS
 - ensure that photo can be downloaded via the proxy server
