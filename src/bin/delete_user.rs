@@ -15,5 +15,5 @@ fn main() {
     stdin().read_line(&mut email).unwrap();
     let email = &email[..(email.len() - 1)]; // Drop the newline character
 
-    delete_user(&connection, email.to_owned());
+    delete_user(&connection, &email.to_owned());
 }

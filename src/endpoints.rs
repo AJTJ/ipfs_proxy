@@ -1,4 +1,6 @@
-use crate::actions::{self, find_user, return_data};
+use crate::actions::{
+    self, create_new_api_key, disable_api_key, find_user, get_all_api_key_data, save_api_request,
+};
 use actix_identity::Identity;
 use actix_web::{get, post, web, Error, HttpRequest, HttpResponse, Responder};
 use argon2::{self, Config};
@@ -38,16 +40,16 @@ pub async fn register(
     let config = Config::default();
     let salt_gen: SaltType = rand::thread_rng().gen::<SaltType>();
     let salt: &[u8] = &salt_gen[..];
+    println!("salt: {:?}", salt);
     let password_hash = argon2::hash_encoded(password.as_bytes(), &salt, &config).unwrap();
-    let converted_salt = str::from_utf8(salt).unwrap();
 
     // save email and password in database
     // use web::block to offload blocking Diesel code without blocking server thread
+    let salt_vec = salt.to_vec();
     let email_clone = email.clone();
-    let converted_salt = converted_salt.to_owned();
     let user = web::block(move || {
         let conn = pool.get().expect("couldn't get db connection from pool");
-        actions::create_user(&conn, email_clone, password_hash, converted_salt)
+        actions::create_user(&conn, email_clone, password_hash, salt_vec)
     })
     .await
     .map_err(|e| {
@@ -76,7 +78,7 @@ pub async fn login(
     let password = body_json.password;
 
     // get user
-    let user = find_user(&conn, email.to_owned());
+    let user = find_user(&conn, &email);
 
     match user {
         Ok(usr) => {
@@ -94,7 +96,7 @@ pub async fn login(
                             id.remember(email.to_owned());
 
                             // return all api_keys and user data
-                            let return_data = return_data(&conn, user_record.id);
+                            let return_data = get_all_api_key_data(&conn, &email);
 
                             HttpResponse::Ok().body(json!(return_data))
                         }
@@ -117,44 +119,60 @@ pub async fn logout(id: Identity) -> impl Responder {
 }
 
 // API KEY ENDPOINTS
-#[post("/deletekey")]
-pub async fn delete_key(id: Identity, api_key: String) -> impl Responder {
+#[post("/disablekey")]
+pub async fn delete_key(id: Identity, pool: web::Data<DbPool>, req_body: String) -> impl Responder {
     // check login with actix_identity
     match id.identity() {
         Some(_) => {
-            // remove api key from database
+            let conn = pool.get().expect("couldn't get db connection from pool");
+            let body_json: ApiKeyRequest =
+                serde_json::from_str(&req_body).expect("error in login body");
+            let api_key = body_json.api_key;
+            let key = disable_api_key(&conn, api_key).unwrap();
             // return all api_keys and user data
-            HttpResponse::Ok().body("Should delete a key here")
+            HttpResponse::Ok().body(json!(key))
         }
         None => HttpResponse::Forbidden().finish(),
     }
 }
 
 #[get("/getapikey")]
-pub async fn get_api_key(id: Identity) -> impl Responder {
+pub async fn get_api_key(id: Identity, pool: web::Data<DbPool>) -> impl Responder {
+    let conn = pool.get().expect("couldn't get db connection from pool");
+
     // check login with actix_identity
     match id.identity() {
-        Some(_) => {
-            // generate new uuid
-            // save to database
-            // return all api_keys and user data
-            HttpResponse::Ok().body("Should get a new api key here")
+        Some(usr_email) => {
+            create_new_api_key(&conn, &usr_email).unwrap();
+            let all_data = get_all_api_key_data(&conn, &usr_email);
+            HttpResponse::Ok().body(json!(all_data))
         }
         None => HttpResponse::Forbidden().finish(),
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ApiKeyRequest {
+    api_key: Uuid,
+}
+
 // NODE REQUESTS
-#[post("/getphoto")]
-pub async fn get_photo(id: Identity) -> impl Responder {
+#[post("/interactnode")]
+pub async fn get_photo(id: Identity, pool: web::Data<DbPool>, req_body: String) -> impl Responder {
+    let conn = pool.get().expect("couldn't get db connection from pool");
     // check login with actix_identity
     match id.identity() {
         Some(_) => {
+            // need error handling for receiving incompatible data from front-end
+            let body_json: ApiKeyRequest =
+                serde_json::from_str(&req_body).expect("error in login body");
+            let api_key = body_json.api_key;
             // save key_request
+            let new_request = save_api_request(&conn, api_key).unwrap();
             // process request
             // return response
             // return all api_keys and user data
-            HttpResponse::Ok().body("Should request a photo from the node with an api key here")
+            HttpResponse::Ok().body(json!(new_request))
         }
         None => HttpResponse::Forbidden().finish(),
     }

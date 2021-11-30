@@ -5,7 +5,6 @@ use diesel::prelude::*;
 use dotenv::dotenv;
 use std::env;
 pub mod actions;
-pub mod dto;
 pub mod endpoints;
 pub mod models;
 pub mod schema;

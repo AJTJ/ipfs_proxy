@@ -15,6 +15,6 @@ fn main() {
         .expect("Error loading users");
 
     for user in results {
-        println!("{}, {}, {}", user.email, user.pw_hash, user.salt);
+        println!("{}, {}, {:?}", user.email, user.pw_hash, user.salt);
     }
 }

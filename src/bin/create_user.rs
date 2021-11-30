@@ -5,6 +5,7 @@ extern crate ipfs_proxy;
 
 use self::ipfs_proxy::actions::*;
 use self::ipfs_proxy::*;
+use rand::Rng;
 use std::io::stdin;
 
 fn main() {
@@ -17,17 +18,18 @@ fn main() {
     let mut pw_hash = String::new();
     stdin().read_line(&mut pw_hash).unwrap();
     let pw_hash = &pw_hash[..(pw_hash.len() - 1)]; // Drop the newline character
-    let mut salt = String::new();
-    stdin().read_line(&mut salt).unwrap();
-    let salt = &salt[..(salt.len() - 1)]; // Drop the newline character
+    type SaltType = [u8; 32];
+    let salt_gen: SaltType = rand::thread_rng().gen::<SaltType>();
+    let salt: &[u8] = &salt_gen[..];
+    let salt_vec = salt.to_vec();
 
     let user = create_user(
         &connection,
         email.to_owned(),
         pw_hash.to_owned(),
-        salt.to_owned(),
+        salt_vec.to_owned(),
     );
-    println!("\nSaved draft {}", email);
+    println!("user: {:?}", user.unwrap().email);
 }
 
 // #[cfg(not(windows))]
