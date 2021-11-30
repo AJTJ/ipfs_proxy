@@ -40,7 +40,6 @@ pub async fn register(
     let config = Config::default();
     let salt_gen: SaltType = rand::thread_rng().gen::<SaltType>();
     let salt: &[u8] = &salt_gen[..];
-    println!("salt: {:?}", salt);
     let password_hash = argon2::hash_encoded(password.as_bytes(), &salt, &config).unwrap();
 
     // save email and password in database
