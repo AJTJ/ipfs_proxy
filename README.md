@@ -22,12 +22,11 @@ Endpoints (with JSON data, if required)
 
 Some things (amongst others) I would change for PROD.
 - Separate things into services: simpleapi, auth etc...
-- A configured IPFS server
-- better session management
-  - usually running redis
-- improved data retrieval (turning requests into a CSV per api_key, perhaps)
 - much better error handling
-  - blind panics should not happen
+  - Especially with I/O processes
+- much better session management
+  - probably running redis
+- improved data retrieval (turning requests into a CSV per api_key, perhaps)
 - edge and not-so-edge case handling
   - such as checking for emails/accounts that already exist
 - perhaps more information and more specific data types stored in the database

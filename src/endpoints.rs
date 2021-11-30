@@ -2,7 +2,7 @@ use crate::actions::{
     self, create_new_api_key, disable_api_key, find_user, get_all_api_key_data, save_api_request,
 };
 use actix_identity::Identity;
-use actix_web::{get, post, web, Error, HttpRequest, HttpResponse, Responder};
+use actix_web::{get, post, web, Error, HttpResponse, Responder};
 use argon2::{self, Config};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{self, ConnectionManager};
@@ -26,7 +26,6 @@ type SaltType = [u8; 32];
 #[post("/register")]
 pub async fn register(
     id: Identity,
-    req: HttpRequest,
     req_body: String,
     pool: web::Data<DbPool>,
 ) -> Result<impl Responder, Error> {
@@ -65,12 +64,7 @@ pub async fn register(
 }
 
 #[post("/login")]
-pub async fn login(
-    id: Identity,
-    req: HttpRequest,
-    req_body: String,
-    pool: web::Data<DbPool>,
-) -> impl Responder {
+pub async fn login(id: Identity, req_body: String, pool: web::Data<DbPool>) -> impl Responder {
     let conn = pool.get().expect("couldn't get db connection from pool");
 
     // need error handling for receiving incompatible data from front-end
@@ -173,8 +167,8 @@ pub async fn get_photo(
                 serde_json::from_str(&req_body).expect("error in login body");
             let api_key = body_json.api_key;
             // save key_request
-            let key_request = save_api_request(&conn, api_key).unwrap();
-            // process request
+            save_api_request(&conn, api_key).unwrap();
+            // process node request
             let client = reqwest::Client::new();
             let res = client
                 .post("http://127.0.0.1:5001/api/v0/bitswap/reprovide")

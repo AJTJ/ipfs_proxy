@@ -1,12 +1,10 @@
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware::Logger, App, HttpServer};
 use diesel::pg::PgConnection;
-use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
 use dotenv::dotenv;
 use rand::Rng;
 use std::env;
-use std::thread;
 
 // ENDPOINTS
 use ipfs_proxy::endpoints::{delete_key, echo, get_api_key, get_photo, login, logout, register};

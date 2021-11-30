@@ -1,9 +1,9 @@
-use crate::models::{self, KeyRequestDTO, KeyRequests, KeysWithRequests, NewKeyRequest};
+use crate::models::{self, KeyRequestDTO, NewKeyRequest};
 use crate::models::{ApiKey, NewApiKey};
 use crate::schema;
 use chrono::prelude::*;
 use diesel::pg::PgConnection;
-use diesel::{dsl, prelude::*};
+use diesel::prelude::*;
 use uuid::Uuid;
 
 type DbError = Box<dyn std::error::Error + Send + Sync>;
