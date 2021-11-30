@@ -8,6 +8,7 @@ Setup:
 - run `diesel migration run` while in the repo to build database
 - start/compile the server with `cargo run`
 - interact with the server at `http://127.0.0.1:8090/` through postman or curl
+- if api key is valid, user is authed and node is running it will respond with "reprovider is already running"
 
 Endpoints (with JSON data, if required)
 ```

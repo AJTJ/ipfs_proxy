@@ -1,5 +1,6 @@
 use crate::actions::{
-    self, create_new_api_key, disable_api_key, find_user, get_all_api_key_data, save_api_request,
+    self, create_new_api_key, disable_api_key, find_user, get_all_api_key_data, get_single_api_key,
+    save_api_request,
 };
 use actix_identity::Identity;
 use actix_web::{get, post, web, Error, HttpResponse, Responder};
@@ -165,23 +166,30 @@ pub async fn get_photo(
             let body_json: ApiKeyRequest =
                 serde_json::from_str(&req_body).expect("error in login body");
             let api_key = body_json.api_key;
-            // save key_request
-            save_api_request(&conn, api_key).unwrap();
-            // process node request
-            let client = reqwest::Client::new();
-            let res = client
-                .post("http://127.0.0.1:5001/api/v0/bitswap/reprovide")
-                .body("the exact body that is sent")
-                .send()
-                .await
-                .expect("unsuccessful node interaction")
-                .text()
-                .await
-                .expect("no text");
 
-            // return response
-            // return all api_keys and user data
-            Ok(HttpResponse::Ok().body(json!(res)))
+            // get key from db NEEDS better error handling
+            let retrieved_key = get_single_api_key(&conn, api_key).unwrap().expect("no key");
+            if retrieved_key.is_enabled == true {
+                // save key_request
+                save_api_request(&conn, api_key).unwrap();
+                // process node request
+                let client = reqwest::Client::new();
+                let res = client
+                    .post("http://127.0.0.1:5001/api/v0/bitswap/reprovide")
+                    .body("the exact body that is sent")
+                    .send()
+                    .await
+                    .expect("unsuccessful node interaction")
+                    .text()
+                    .await
+                    .expect("no text");
+
+                // return response
+                // return all api_keys and user data
+                Ok(HttpResponse::Ok().body(json!(res)))
+            } else {
+                Ok(HttpResponse::BadRequest().body(json!("key is disabled")))
+            }
         }
         None => Ok(HttpResponse::Forbidden().finish()),
     }
