@@ -3,8 +3,8 @@ Setup:
 - start an ipfs node with default settings
 - start a postgres docker image
 `docker run --name ipfs-node-postgres -e POSTGRES_PASSWORD=mysecretpassword -dp 5432:5432 postgres`
-- ensure you have postgres installed on your machine (diesel requires)
-- install diesel cli `cargo install diesel_cli --no-default-features --features postgres`
+- ensure you have postgres installed on your machine (diesel-cli requires)
+- install diesel-cli `cargo install diesel_cli --no-default-features --features postgres`
 - run `diesel migration run` while in the repo to build database
 - start/compile the server with `cargo run`
 - interact with the server at `http://127.0.0.1:8090/` through postman or curl
