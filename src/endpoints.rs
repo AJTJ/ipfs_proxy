@@ -1,7 +1,6 @@
-use crate::actions::{
-    self, create_new_api_key, disable_api_key, find_user, get_all_api_key_data, get_single_api_key,
-    save_api_request,
-};
+use crate::actions;
+use crate::models::{self, KeyRequestDTO, NewKeyRequest};
+use crate::models::{ApiKey, NewApiKey};
 use actix_identity::Identity;
 use actix_web::{get, post, web, Error, HttpResponse, Responder};
 use argon2::{self, Config};
@@ -22,6 +21,23 @@ pub struct SignInSignUp {
 
 type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 type SaltType = [u8; 32];
+
+async fn return_data(
+    pool: web::Data<DbPool>,
+    email: String,
+) -> Result<Vec<(ApiKey, Option<KeyRequestDTO>)>, Error> {
+    let user = web::block(move || {
+        let conn = pool.get().expect("couldn't get db connection from pool");
+        actions::get_all_api_key_data(&conn, &email)
+    })
+    .await
+    .map_err(|e| {
+        eprintln!("{}", e);
+        HttpResponse::InternalServerError().finish()
+    })?;
+
+    Ok(user)
+}
 
 // AUTH ENDPOINTS
 #[post("/register")]
@@ -72,8 +88,19 @@ pub async fn login(id: Identity, req_body: String, pool: web::Data<DbPool>) -> i
     let email = body_json.email;
     let password = body_json.password;
 
-    // get user
-    let user = find_user(&conn, &email);
+    let closure_email = email.clone();
+    let closure_pool = pool.clone();
+    let user = web::block(move || {
+        let conn = closure_pool
+            .get()
+            .expect("couldn't get db connection from pool");
+        actions::find_user(&conn, &closure_email)
+    })
+    .await
+    .map_err(|e| {
+        eprintln!("{}", e);
+        HttpResponse::InternalServerError().finish()
+    });
 
     match user {
         Ok(usr) => {
@@ -91,7 +118,10 @@ pub async fn login(id: Identity, req_body: String, pool: web::Data<DbPool>) -> i
                             id.remember(email.to_owned());
 
                             // return all api_keys and user data
-                            let return_data = get_all_api_key_data(&conn, &email);
+                            let closure_email = email.clone();
+                            let closure_pool = pool.clone();
+                            let return_data =
+                                return_data(closure_pool, closure_email).await.unwrap();
 
                             HttpResponse::Ok().body(json!(return_data))
                         }
@@ -115,7 +145,11 @@ pub async fn logout(id: Identity) -> impl Responder {
 
 // API KEY ENDPOINTS
 #[post("/disablekey")]
-pub async fn delete_key(id: Identity, pool: web::Data<DbPool>, req_body: String) -> impl Responder {
+pub async fn delete_key(
+    id: Identity,
+    pool: web::Data<DbPool>,
+    req_body: String,
+) -> Result<impl Responder, Error> {
     // check login with actix_identity
     match id.identity() {
         Some(_) => {
@@ -123,26 +157,51 @@ pub async fn delete_key(id: Identity, pool: web::Data<DbPool>, req_body: String)
             let body_json: ApiKeyRequest =
                 serde_json::from_str(&req_body).expect("error in login body");
             let api_key = body_json.api_key;
-            let key = disable_api_key(&conn, api_key).unwrap();
+
+            let key = web::block(move || {
+                let conn = pool.get().expect("couldn't get db connection from pool");
+                actions::disable_api_key(&conn, api_key)
+            })
+            .await
+            .map_err(|e| {
+                eprintln!("{}", e);
+                HttpResponse::InternalServerError().finish()
+            })?;
+
             // return all api_keys and user data
-            HttpResponse::Ok().body(json!(key))
+            Ok(HttpResponse::Ok().body(json!(key)))
         }
-        None => HttpResponse::Forbidden().finish(),
+        None => Ok(HttpResponse::Forbidden().finish()),
     }
 }
 
 #[get("/getapikey")]
-pub async fn get_api_key(id: Identity, pool: web::Data<DbPool>) -> impl Responder {
+pub async fn get_api_key(id: Identity, pool: web::Data<DbPool>) -> Result<impl Responder, Error> {
     let conn = pool.get().expect("couldn't get db connection from pool");
 
     // check login with actix_identity
     match id.identity() {
         Some(usr_email) => {
-            create_new_api_key(&conn, &usr_email).unwrap();
-            let all_data = get_all_api_key_data(&conn, &usr_email);
-            HttpResponse::Ok().body(json!(all_data))
+            let closure_email = usr_email.clone();
+            let closure_pool = pool.clone();
+            web::block(move || {
+                let conn = closure_pool
+                    .get()
+                    .expect("couldn't get db connection from pool");
+                actions::create_new_api_key(&conn, &closure_email)
+            })
+            .await
+            .map_err(|e| {
+                eprintln!("{}", e);
+                HttpResponse::InternalServerError().finish()
+            })?;
+
+            let closure_email = usr_email.clone();
+            let closure_pool = pool.clone();
+            let return_data = return_data(closure_pool, closure_email).await.unwrap();
+            Ok(HttpResponse::Ok().body(json!(return_data)))
         }
-        None => HttpResponse::Forbidden().finish(),
+        None => Ok(HttpResponse::Forbidden().finish()),
     }
 }
 
@@ -168,10 +227,40 @@ pub async fn get_photo(
             let api_key = body_json.api_key;
 
             // get key from db NEEDS better error handling
-            let retrieved_key = get_single_api_key(&conn, api_key).unwrap().expect("no key");
-            if retrieved_key.is_enabled == true {
+            // let retrieved_key = get_single_api_key(&conn, api_key).unwrap().expect("no key");
+
+            let closure_pool = pool.clone();
+            let closure_key = api_key.clone();
+            let retrieved_key = web::block(move || {
+                let conn = closure_pool
+                    .get()
+                    .expect("couldn't get db connection from pool");
+                actions::get_single_api_key(&conn, closure_key)
+            })
+            .await
+            .map_err(|e| {
+                eprintln!("{}", e);
+                HttpResponse::InternalServerError().finish()
+            })?
+            .unwrap();
+
+            if (retrieved_key.is_enabled) == true {
                 // save key_request
-                save_api_request(&conn, api_key).unwrap();
+
+                let closure_pool = pool.clone();
+                let closure_key = api_key.clone();
+                web::block(move || {
+                    let conn = closure_pool
+                        .get()
+                        .expect("couldn't get db connection from pool");
+                    actions::save_api_request(&conn, closure_key)
+                })
+                .await
+                .map_err(|e| {
+                    eprintln!("{}", e);
+                    HttpResponse::InternalServerError().finish()
+                })?;
+
                 // process node request
                 let client = reqwest::Client::new();
                 let res = client

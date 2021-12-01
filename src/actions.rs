@@ -50,7 +50,7 @@ pub fn delete_user(conn: &PgConnection, input_email: &String) {
 pub fn get_all_api_key_data(
     conn: &PgConnection,
     input_email: &String,
-) -> Vec<(ApiKey, Option<KeyRequestDTO>)> {
+) -> Result<Vec<(ApiKey, Option<KeyRequestDTO>)>, DbError> {
     use schema::api_key;
     use schema::key_requests;
 
@@ -64,7 +64,7 @@ pub fn get_all_api_key_data(
         .load(conn)
         .expect("failed to load data");
 
-    data
+    Ok(data)
 }
 
 pub fn create_new_api_key(
