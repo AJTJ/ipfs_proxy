@@ -1,6 +1,6 @@
 use crate::actions;
-use crate::models::{self, KeyRequestDTO, NewKeyRequest};
-use crate::models::{ApiKey, NewApiKey};
+use crate::models::ApiKey;
+use crate::models::KeyRequestDTO;
 use actix_identity::Identity;
 use actix_web::{get, post, web, Error, HttpResponse, Responder};
 use argon2::{self, Config};
@@ -26,7 +26,7 @@ async fn return_data(
     pool: web::Data<DbPool>,
     email: String,
 ) -> Result<Vec<(ApiKey, Option<KeyRequestDTO>)>, Error> {
-    let user = web::block(move || {
+    let return_data = web::block(move || {
         let conn = pool.get().expect("couldn't get db connection from pool");
         actions::get_all_api_key_data(&conn, &email)
     })
@@ -36,7 +36,7 @@ async fn return_data(
         HttpResponse::InternalServerError().finish()
     })?;
 
-    Ok(user)
+    Ok(return_data)
 }
 
 // AUTH ENDPOINTS
@@ -81,8 +81,6 @@ pub async fn register(
 
 #[post("/login")]
 pub async fn login(id: Identity, req_body: String, pool: web::Data<DbPool>) -> impl Responder {
-    let conn = pool.get().expect("couldn't get db connection from pool");
-
     // need error handling for receiving incompatible data from front-end
     let body_json: SignInSignUp = serde_json::from_str(&req_body).expect("error in login body");
     let email = body_json.email;
@@ -153,7 +151,6 @@ pub async fn delete_key(
     // check login with actix_identity
     match id.identity() {
         Some(_) => {
-            let conn = pool.get().expect("couldn't get db connection from pool");
             let body_json: ApiKeyRequest =
                 serde_json::from_str(&req_body).expect("error in login body");
             let api_key = body_json.api_key;
@@ -177,8 +174,6 @@ pub async fn delete_key(
 
 #[get("/getapikey")]
 pub async fn get_api_key(id: Identity, pool: web::Data<DbPool>) -> Result<impl Responder, Error> {
-    let conn = pool.get().expect("couldn't get db connection from pool");
-
     // check login with actix_identity
     match id.identity() {
         Some(usr_email) => {
@@ -217,7 +212,6 @@ pub async fn get_photo(
     pool: web::Data<DbPool>,
     req_body: String,
 ) -> Result<impl Responder, Error> {
-    let conn = pool.get().expect("couldn't get db connection from pool");
     // check login with actix_identity
     match id.identity() {
         Some(_) => {
