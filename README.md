@@ -39,9 +39,3 @@ Some things (amongst others) I would change for PROD.
 - write some tests
 - more checks to ensure that api_keys are valid, user id is valid, etc.
 - containerization to ensure endpoint security
-
-STEPS
-- ensure that photo can be downloaded via the proxy server
-- limit node access to only coming from the proxy server
-- log requests in proxy server
-  - add requests with date/time stamp to database schema
